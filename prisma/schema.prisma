@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          String    @id @default(uuid()) @map("id")
+  email       String    @unique
+  password    String
+  displayName String?   @map("display_name")
+  phoneNumber String?   @map("phone_number")
+  role        Role      @default(CLIENT)
+  latitude    Decimal?  @db.Decimal(9,6)
+  longitude   Decimal?  @db.Decimal(9,6)
+  fcmToken    String?   @map("fcm_token")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  merchant    Merchant?
+  orders      Order[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Merchant {
+  id           String    @id @default(uuid()) @map("id")
+  userId       String    @unique @map("user_id")
+  businessName String    @map("business_name")
+  type         String?
+  address      String?
+  latitude     Decimal?  @db.Decimal(9,6)
+  longitude    Decimal?  @db.Decimal(9,6)
+  phoneNumber  String?   @map("phone_number")
+  photoURL     String?   @map("photo_url")
+  status       MerchantStatus @default(PENDING)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  baskets      Basket[]
+  orders       Order[]
+
+  @@map("merchants")
+}
+
+model Basket {
+  id               String    @id @default(uuid()) @map("id")
+  merchantId       String    @map("merchant_id")
+  title            String
+  description      String?
+  category         Category?
+  originalPrice    Int       @map("original_price")
+  discountedPrice  Int       @map("discounted_price")
+  quantity         Int
+  availableQuantity Int       @map("available_quantity")
+  pickupTimeStart  DateTime  @map("pickup_time_start")
+  pickupTimeEnd    DateTime  @map("pickup_time_end")
+  photoURL         String?   @map("photo_url")
+  status           BasketStatus @default(AVAILABLE)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  merchant         Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  orders           Order[]
+
+  @@map("baskets")
+}
+
+model Order {
+  id             String    @id @default(uuid()) @map("id")
+  userId         String    @map("user_id")
+  basketId       String    @map("basket_id")
+  merchantId     String    @map("merchant_id")
+  price          Int
+  paymentMethod  PaymentMethod? @map("payment_method")
+  paymentStatus  PaymentStatus? @map("payment_status")
+  orderStatus    OrderStatus?   @map("order_status")
+  qrCode         String    @unique @map("qr_code")
+  transactionRef String?   @map("transaction_ref")
+  paidAt         DateTime? @map("paid_at")
+  pickedUpAt     DateTime? @map("picked_up_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  basket         Basket    @relation(fields: [basketId], references: [id], onDelete: Cascade)
+  merchant       Merchant  @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@map("orders")
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @map("id")
+  userId    String    @map("user_id")
+  title     String?
+  body      String?
+  type      String?
+  data      Json?
+  isRead    Boolean   @default(false) @map("is_read")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+enum Role {
+  CLIENT
+  MERCHANT
+  ADMIN
+}
+
+enum MerchantStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Category {
+  SWEET
+  SAVORY
+  MIXED
+}
+
+enum BasketStatus {
+  AVAILABLE
+  SOLD_OUT
+  EXPIRED
+}
+
+enum PaymentMethod {
+  FLOOZ
+  TMONEY
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum OrderStatus {
+  RESERVED
+  PICKED_UP
+  CANCELLED
+}
