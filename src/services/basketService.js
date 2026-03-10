@@ -2,6 +2,19 @@
 import prisma from '../utils/prisma.js';
 import { haversineDistance } from '../utils/haversine.js';
 
+const RETENTION_HOURS = 2;
+
+const markExpiredBaskets = async () => {
+  const now = new Date();
+  await prisma.basket.updateMany({
+    where: {
+      status: 'AVAILABLE',
+      pickupTimeEnd: { lt: now },
+    },
+    data: { status: 'EXPIRED' },
+  });
+};
+
 export const createBasket = async (merchantId, data) => {
   const { title, description, category, originalPrice, discountedPrice, quantity, pickupTimeStart, pickupTimeEnd, photoURL } = data;
 
@@ -32,9 +45,13 @@ export const createBasket = async (merchantId, data) => {
 export const getBaskets = async (filters) => {
   const { lat, lon, radius, category, maxPrice } = filters;
 
+  await markExpiredBaskets();
+
+  const now = new Date();
+  const retentionCutoff = new Date(now.getTime() - RETENTION_HOURS * 60 * 60 * 1000);
+
   const where = {
-    status: 'AVAILABLE', // Ne retourner que les paniers disponibles
-    availableQuantity: { gt: 0 } // Ne retourner que les paniers avec une quantité disponible
+    pickupTimeEnd: { gte: retentionCutoff },
   };
 
   if (category) {
@@ -58,12 +75,20 @@ export const getBaskets = async (filters) => {
     },
   });
 
-  // Si lat, lon et radius sont fournis, on filtre par géolocalisation
   if (lat && lon && radius) {
-    baskets = baskets.map(basket => {
-      const distance = haversineDistance(parseFloat(lat), parseFloat(lon), parseFloat(basket.merchant.latitude), parseFloat(basket.merchant.longitude));
-      return { ...basket, distanceKm: distance };
-    }).filter(basket => basket.distanceKm <= parseFloat(radius))
+    const userLat = parseFloat(lat);
+    const userLon = parseFloat(lon);
+    const maxRadius = parseFloat(radius);
+
+    baskets = baskets
+      .filter((basket) => basket.merchant?.latitude != null && basket.merchant?.longitude != null)
+      .map((basket) => {
+        const merchantLat = parseFloat(basket.merchant.latitude);
+        const merchantLon = parseFloat(basket.merchant.longitude);
+        const distance = haversineDistance(userLat, userLon, merchantLat, merchantLon);
+        return { ...basket, distanceKm: distance };
+      })
+      .filter((basket) => basket.distanceKm <= maxRadius)
       .sort((a, b) => a.distanceKm - b.distanceKm);
   }
 
@@ -71,6 +96,8 @@ export const getBaskets = async (filters) => {
 };
 
 export const getBasketById = async (id) => {
+  await markExpiredBaskets();
+
   const basket = await prisma.basket.findUnique({
     where: { id },
     include: {

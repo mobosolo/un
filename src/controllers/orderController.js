@@ -1,5 +1,5 @@
 // src/controllers/orderController.js
-import { createOrder, getMyOrders, getMerchantOrders, getOrderById, validateOrderPickup } from '../services/orderService.js';
+import { createOrder, getMyOrders, getMerchantOrders, getOrderById, validateOrderPickup, cancelOrder } from '../services/orderService.js';
 import { validationResult } from 'express-validator';
 import { Role } from '@prisma/client';
 import prisma from '../utils/prisma.js';
@@ -108,5 +108,24 @@ export const validatePickup = async (req, res) => {
       return res.status(400).json({ message: error.message });
     }
     res.status(500).json({ message: 'Erreur lors de la validation du retrait.', error: error.message });
+  }
+};
+
+export const cancel = async (req, res) => {
+  const { id: orderId } = req.params;
+  const { id: userId } = req.user;
+
+  try {
+    const updated = await cancelOrder(orderId, userId);
+    res.status(200).json({ message: 'Commande annulee.', order: updated });
+  } catch (error) {
+    if (
+      error.message === 'Commande introuvable.' ||
+      error.message === 'Acces interdit.' ||
+      error.message === 'Cette commande a deja ete retiree.'
+    ) {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Erreur lors de l\'annulation.', error: error.message });
   }
 };

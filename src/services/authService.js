@@ -1,30 +1,31 @@
-import bcrypt from "bcryptjs";
+﻿import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../utils/prisma.js";
-import { Role } from "@prisma/client"; // ✅ importer directement l'enum
+import { Role } from "@prisma/client";
+import crypto from "crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
 
 export const registerUser = async (email, password, displayName, phoneNumber, role) => {
-  // Vérifier si l'utilisateur existe déjà
+  // Verifier si l'utilisateur existe deja
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
-    throw new Error("Cet email est déjà utilisé.");
+    throw new Error("Cet email est deja utilise.");
   }
 
   // Hacher le mot de passe
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Vérifier et convertir le rôle fourni
+  // Verifier et convertir le role fourni
   let userRole;
   if (role && Role[role.toUpperCase()]) {
     userRole = Role[role.toUpperCase()];
   } else {
-    userRole = Role.CLIENT; // ✅ valeur par défaut
+    userRole = Role.CLIENT; // valeur par defaut
   }
 
-  // Créer l'utilisateur
+  // Creer l'utilisateur
   const user = await prisma.user.create({
     data: {
       email,
@@ -41,7 +42,7 @@ export const registerUser = async (email, password, displayName, phoneNumber, ro
     },
   });
 
-  // Générer le token JWT
+  // Generer le token JWT
   const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
   });
@@ -62,7 +63,7 @@ export const loginUser = async (email, password) => {
     throw new Error('Identifiants invalides.');
   }
 
-  // Générer le token JWT
+  // Generer le token JWT
   const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 
   // Retourne l'utilisateur avec les champs pertinents
@@ -74,4 +75,53 @@ export const loginUser = async (email, password) => {
   };
 
   return { user: userResponse, token };
+};
+
+export const requestPasswordReset = async (email) => {
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) {
+    return null;
+  }
+
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const expires = new Date(Date.now() + 60 * 60 * 1000);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: expires,
+    },
+  });
+
+  return { token: rawToken, expires };
+};
+
+export const resetPassword = async (email, token, newPassword) => {
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+  const user = await prisma.user.findFirst({
+    where: {
+      email,
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { gt: new Date() },
+    },
+  });
+
+  if (!user) {
+    throw new Error("Token invalide ou expire.");
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
+    },
+  });
+
+  return true;
 };

@@ -45,3 +45,52 @@ export const getAdminStats = async () => {
     },
   };
 };
+
+export const listMerchants = async ({ status } = {}) => {
+  const where = {};
+  if (status) {
+    where.status = status;
+  }
+
+  const merchants = await prisma.merchant.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    include: {
+      user: {
+        select: {
+          email: true,
+          displayName: true,
+          phoneNumber: true,
+        },
+      },
+    },
+  });
+
+  return merchants.map((merchant) => ({
+    ...merchant,
+    latitude: merchant.latitude ? parseFloat(merchant.latitude) : null,
+    longitude: merchant.longitude ? parseFloat(merchant.longitude) : null,
+  }));
+};
+
+export const listUsers = async ({ role } = {}) => {
+  const where = {};
+  if (role) {
+    where.role = role;
+  }
+
+  const users = await prisma.user.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      email: true,
+      displayName: true,
+      phoneNumber: true,
+      role: true,
+      createdAt: true,
+    },
+  });
+
+  return users;
+};

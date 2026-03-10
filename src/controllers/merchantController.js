@@ -57,3 +57,47 @@ export const updateMyCommerce = async (req, res) => {
     res.status(500).json({ message: 'Erreur lors de la mise Ã  jour du commerce.', error: error.message });
   }
 };
+
+export const getDailyStats = async (req, res) => {
+  const { id: userId } = req.user;
+  try {
+    const merchant = await prisma.merchant.findUnique({ where: { userId } });
+    if (!merchant) {
+      return res.status(404).json({ message: 'Commerce introuvable.' });
+    }
+
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    const pickedUpCount = await prisma.order.count({
+      where: {
+        merchantId: merchant.id,
+        orderStatus: 'PICKED_UP',
+        pickedUpAt: { gte: start, lte: end },
+      },
+    });
+
+    const revenueAgg = await prisma.order.aggregate({
+      where: {
+        merchantId: merchant.id,
+        paymentStatus: 'PAID',
+        orderStatus: { not: 'CANCELLED' },
+        paidAt: { gte: start, lte: end },
+      },
+      _sum: { price: true },
+    });
+
+    const revenue = revenueAgg._sum.price || 0;
+    const foodSavedKg = pickedUpCount * 2;
+
+    return res.status(200).json({
+      basketsSoldToday: pickedUpCount,
+      revenueToday: revenue,
+      foodSavedKg,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Erreur lors de la recuperation des statistiques.', error: error.message });
+  }
+};

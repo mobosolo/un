@@ -1,7 +1,7 @@
 // src/routes/merchantRoutes.js
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { register, getMyCommerce, updateMyCommerce } from '../controllers/merchantController.js';
+import { register, getMyCommerce, updateMyCommerce, getDailyStats } from '../controllers/merchantController.js';
 import { getCommerceOrders } from '../controllers/orderController.js'; // Import getCommerceOrders
 import { protect, authorize } from '../middlewares/authMiddleware.js';
 import { Role } from '@prisma/client';
@@ -30,6 +30,7 @@ const updateValidation = [
 
 router.post('/register', protect, authorize([Role.CLIENT, Role.MERCHANT]), registerValidation, register);
 router.get('/me', protect, authorize(Role.MERCHANT), getMyCommerce);
+router.get('/stats', protect, authorize(Role.MERCHANT), getDailyStats);
 router.put('/:id', protect, authorize([Role.MERCHANT, Role.ADMIN]), updateValidation, updateMyCommerce);
 router.get('/orders', protect, authorize(Role.MERCHANT), getCommerceOrders); // New route
 

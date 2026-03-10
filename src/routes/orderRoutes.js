@@ -1,7 +1,7 @@
 // src/routes/orderRoutes.js
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { create, getClientOrders, getOne, validatePickup } from '../controllers/orderController.js';
+import { create, getClientOrders, getOne, validatePickup, cancel } from '../controllers/orderController.js';
 import { protect, authorize } from '../middlewares/authMiddleware.js';
 import { Role, PaymentMethod } from '@prisma/client';
 
@@ -20,5 +20,6 @@ router.post('/', protect, authorize(Role.CLIENT), createOrderValidation, create)
 router.get('/my-orders', protect, authorize(Role.CLIENT), getClientOrders);
 router.get('/:id', protect, getOne); // Accessible par CLIENT, MERCHANT, ADMIN
 router.post('/:id/pickup', protect, authorize(Role.MERCHANT), validatePickupValidation, validatePickup);
+router.post('/:id/cancel', protect, authorize(Role.CLIENT), cancel);
 
 export default router;

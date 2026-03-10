@@ -1,7 +1,7 @@
 // src/routes/authRoutes.js
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { register, login, getMe, updateProfile } from '../controllers/authController.js';
+import { register, login, getMe, updateProfile, forgotPassword, resetPasswordHandler } from '../controllers/authController.js';
 import { registerFcmToken } from '../controllers/notificationController.js';
 import { protect, authorize } from '../middlewares/authMiddleware.js';
 import { Role } from '@prisma/client'; // Importation de l'énumération Role
@@ -37,6 +37,16 @@ const fcmTokenValidation = [
 
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
+router.post('/forgot-password', body('email').isEmail().withMessage('Email invalide'), forgotPassword);
+router.post(
+  '/reset-password',
+  [
+    body('email').isEmail().withMessage('Email invalide'),
+    body('token').notEmpty().withMessage('Token requis'),
+    body('newPassword').isLength({ min: 6 }).withMessage('Le mot de passe doit contenir au moins 6 caracteres'),
+  ],
+  resetPasswordHandler
+);
 router.get('/me', protect, getMe);
 router.put('/profile', protect, updateProfileValidation, updateProfile);
 router.post('/fcm-token', protect, fcmTokenValidation, registerFcmToken);

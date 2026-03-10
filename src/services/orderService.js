@@ -25,6 +25,12 @@ export const createOrder = async (userId, basketId, paymentMethod) => {
   if (basket.availableQuantity <= 0) {
     throw new Error('Ce panier n\'est plus disponible.');
   }
+  if (basket.status !== 'AVAILABLE') {
+    throw new Error('Ce panier n\'est plus disponible.');
+  }
+  if (basket.pickupTimeEnd && new Date(basket.pickupTimeEnd).getTime() < Date.now()) {
+    throw new Error('Ce panier n\'est plus disponible.');
+  }
 
   // Vérifier si l'utilisateur existe pour récupérer ses infos de paiement
   const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -34,10 +40,17 @@ export const createOrder = async (userId, basketId, paymentMethod) => {
 
 
   // Décrémenter la quantité disponible
-  await prisma.basket.update({
+  const updatedBasket = await prisma.basket.update({
     where: { id: basketId },
     data: { availableQuantity: { decrement: 1 } },
+    select: { availableQuantity: true, status: true },
   });
+  if (updatedBasket.availableQuantity <= 0 && updatedBasket.status !== 'SOLD_OUT') {
+    await prisma.basket.update({
+      where: { id: basketId },
+      data: { status: 'SOLD_OUT' },
+    });
+  }
 
   const qrCodeData = uuidv4();
   const qrCodeImage = await QRCode.toDataURL(qrCodeData);
@@ -244,14 +257,46 @@ export const validateOrderPickup = async (orderId, qrCode, merchantUserId) => {
     },
   });
 
-  // Envoyer une notification au client pour le retrait
-  await sendNotification(
-    order.userId,
-    'Commande retirée !',
-    `Votre commande "${order.basket.title}" a bien été retirée.`,
-    'ORDER_PICKED_UP',
-    { orderId: order.id, basketId: order.basket.id }
-  );
+  // Notification push disabled for pickup validation.
+  // The app confirms success directly in UI after scan.
 
   return updatedOrder;
 };
+
+export const cancelOrder = async (orderId, userId) => {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+  });
+
+  if (!order) {
+    throw new Error('Commande introuvable.');
+  }
+
+  if (order.userId !== userId) {
+    throw new Error('Acces interdit.');
+  }
+
+  if (order.orderStatus === 'PICKED_UP') {
+    throw new Error('Cette commande a deja ete retiree.');
+  }
+
+  if (order.orderStatus === 'CANCELLED') {
+    return order;
+  }
+
+  const updated = await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      orderStatus: 'CANCELLED',
+      paymentStatus: order.paymentStatus === 'PAID' ? order.paymentStatus : 'FAILED',
+    },
+  });
+
+  await prisma.basket.update({
+    where: { id: order.basketId },
+    data: { availableQuantity: { increment: 1 }, status: 'AVAILABLE' },
+  });
+
+  return updated;
+};
+
