@@ -1,8 +1,9 @@
 // src/controllers/orderController.js
 import { createOrder, getMyOrders, getMerchantOrders, getOrderById, validateOrderPickup, cancelOrder } from '../services/orderService.js';
 import { validationResult } from 'express-validator';
-import { Role } from '@prisma/client';
+import prismaPkg from '@prisma/client';
 import prisma from '../utils/prisma.js';
+const { Role } = prismaPkg;
 
 export const create = async (req, res) => {
   const errors = validationResult(req);
@@ -129,3 +130,4 @@ export const cancel = async (req, res) => {
     res.status(500).json({ message: 'Erreur lors de l\'annulation.', error: error.message });
   }
 };
+

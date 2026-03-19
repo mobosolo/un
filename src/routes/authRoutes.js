@@ -4,9 +4,10 @@ import { body } from 'express-validator';
 import { register, login, getMe, updateProfile, forgotPassword, resetPasswordHandler } from '../controllers/authController.js';
 import { registerFcmToken } from '../controllers/notificationController.js';
 import { protect, authorize } from '../middlewares/authMiddleware.js';
-import { Role } from '@prisma/client'; // Importation de l'énumération Role
+import prismaPkg from '@prisma/client';
 
 const router = Router();
+const { Role } = prismaPkg;
 
 // Validation pour l'inscription
 const registerValidation = [
@@ -53,3 +54,4 @@ router.post('/fcm-token', protect, fcmTokenValidation, registerFcmToken);
 
 
 export default router;
+

@@ -3,9 +3,10 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { create, getClientOrders, getOne, validatePickup, cancel } from '../controllers/orderController.js';
 import { protect, authorize } from '../middlewares/authMiddleware.js';
-import { Role, PaymentMethod } from '@prisma/client';
+import prismaPkg from '@prisma/client';
 
 const router = Router();
+const { Role, PaymentMethod } = prismaPkg;
 
 const createOrderValidation = [
   body('basketId').isUUID().withMessage('ID de panier invalide'),
@@ -23,3 +24,4 @@ router.post('/:id/pickup', protect, authorize(Role.MERCHANT), validatePickupVali
 router.post('/:id/cancel', protect, authorize(Role.CLIENT), cancel);
 
 export default router;
+

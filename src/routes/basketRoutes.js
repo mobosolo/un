@@ -3,9 +3,10 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 import { create, getAll, getOne, update, remove } from '../controllers/basketController.js';
 import { protect, authorize } from '../middlewares/authMiddleware.js';
-import { Role, Category } from '@prisma/client';
+import prismaPkg from '@prisma/client';
 
 const router = Router();
+const { Role, Category } = prismaPkg;
 
 const basketValidation = [
   body('title').notEmpty().withMessage('Le titre est requis'),
@@ -26,3 +27,4 @@ router.put('/:id', protect, authorize(Role.MERCHANT), basketValidation, update);
 router.delete('/:id', protect, authorize([Role.MERCHANT, Role.ADMIN]), remove);
 
 export default router;
+

@@ -1,5 +1,8 @@
 import bcrypt from "bcryptjs";
-import {
+import prismaPkg from "@prisma/client";
+import prisma from "../src/utils/prisma.js";
+
+const {
   BasketStatus,
   Category,
   MerchantStatus,
@@ -7,8 +10,7 @@ import {
   PaymentMethod,
   PaymentStatus,
   Role,
-} from "@prisma/client";
-import prisma from "../src/utils/prisma.js";
+} = prismaPkg;
 
 async function main() {
   console.log("Seeding database...");

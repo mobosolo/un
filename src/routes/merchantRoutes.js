@@ -4,9 +4,10 @@ import { body } from 'express-validator';
 import { register, getMyCommerce, updateMyCommerce, getDailyStats } from '../controllers/merchantController.js';
 import { getCommerceOrders } from '../controllers/orderController.js'; // Import getCommerceOrders
 import { protect, authorize } from '../middlewares/authMiddleware.js';
-import { Role } from '@prisma/client';
+import prismaPkg from '@prisma/client';
 
 const router = Router();
+const { Role } = prismaPkg;
 
 const registerValidation = [
   body('businessName').notEmpty().withMessage('Le nom de l\'entreprise est requis'),
@@ -35,3 +36,4 @@ router.put('/:id', protect, authorize([Role.MERCHANT, Role.ADMIN]), updateValida
 router.get('/orders', protect, authorize(Role.MERCHANT), getCommerceOrders); // New route
 
 export default router;
+

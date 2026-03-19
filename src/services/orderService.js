@@ -4,7 +4,8 @@ import QRCode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
 import { sendNotification } from './notificationService.js';
 import { initiateStripePayment } from './paymentService.js';
-import { PaymentMethod, Role } from '@prisma/client';
+import prismaPkg from '@prisma/client';
+const { PaymentMethod, Role } = prismaPkg;
 
 export const createOrder = async (userId, basketId, paymentMethod) => {
   const basket = await prisma.basket.findUnique({
@@ -299,4 +300,5 @@ export const cancelOrder = async (orderId, userId) => {
 
   return updated;
 };
+
 

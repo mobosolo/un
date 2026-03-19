@@ -1,11 +1,12 @@
 ﻿import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../utils/prisma.js";
-import { Role } from "@prisma/client";
+import prismaPkg from "@prisma/client";
 import crypto from "crypto";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
+const { Role } = prismaPkg;
 
 export const registerUser = async (email, password, displayName, phoneNumber, role) => {
   // Verifier si l'utilisateur existe deja
