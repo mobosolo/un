@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import prismaPkg from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";  // ✅ bon import
 import dotenv from "dotenv";
@@ -11,6 +11,7 @@ const pool = new Pool({
 
 const adapter = new PrismaPg(pool);  // ✅ bon constructeur
 
+const { PrismaClient } = prismaPkg;
 const prisma = new PrismaClient({ adapter });
 
 export default prisma;

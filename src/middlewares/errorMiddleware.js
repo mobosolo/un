@@ -1,4 +1,6 @@
-import { Prisma } from '@prisma/client';
+import prismaPkg from '@prisma/client';
+
+const { Prisma } = prismaPkg;
 
 const errorMiddleware = (err, req, res, next) => {
   console.error(err); // Affiche l'erreur complète dans la console du serveur
