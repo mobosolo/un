@@ -9,7 +9,8 @@
     "dev": "nodemon src/app.js",
     "postinstall": "prisma generate",
     "seed": "node prisma/seed.js",
-    "seed:reset": "npx prisma migrate reset --force --skip-generate --skip-seed && node prisma/seed.js"
+    "seed:reset": "npx prisma migrate reset --force --skip-generate --skip-seed && node prisma/seed.js",
+    "fix:merchant-coords": "node scripts/fillMerchantCoords.js"
   },
   "keywords": [],
   "author": "",
