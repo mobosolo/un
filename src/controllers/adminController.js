@@ -1,4 +1,4 @@
-﻿// src/controllers/adminController.js
+// src/controllers/adminController.js
 import { approveMerchant, rejectMerchant } from '../services/merchantService.js';
 import { getAdminStats as fetchAdminStats, listMerchants, listUsers } from '../services/adminService.js';
 
@@ -9,7 +9,9 @@ export const approve = async (req, res) => {
     await approveMerchant(id);
     res.status(200).json({ message: 'Commercant approuve' });
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de l\'approbation du commercant.', error: error.message });
+    const status = error.statusCode || 500;
+    const message = status !== 500 && error.message ? error.message : "Erreur lors de l'approbation du commercant.";
+    res.status(status).json({ message });
   }
 };
 
@@ -20,7 +22,9 @@ export const reject = async (req, res) => {
     await rejectMerchant(id);
     res.status(200).json({ message: 'Commercant rejete' });
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors du rejet du commercant.', error: error.message });
+    const status = error.statusCode || 500;
+    const message = status !== 500 && error.message ? error.message : 'Erreur lors du rejet du commercant.';
+    res.status(status).json({ message });
   }
 };
 
@@ -29,7 +33,9 @@ export const getAdminStats = async (req, res) => {
     const stats = await fetchAdminStats();
     res.status(200).json(stats);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la recuperation des statistiques.', error: error.message });
+    const status = error.statusCode || 500;
+    const message = status !== 500 && error.message ? error.message : 'Erreur lors de la recuperation des statistiques.';
+    res.status(status).json({ message });
   }
 };
 
@@ -45,7 +51,9 @@ export const getMerchants = async (req, res) => {
     const merchants = await listMerchants({ status });
     res.status(200).json(merchants);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la recuperation des commercants.', error: error.message });
+    const status = error.statusCode || 500;
+    const message = status !== 500 && error.message ? error.message : 'Erreur lors de la recuperation des commercants.';
+    res.status(status).json({ message });
   }
 };
 
@@ -61,6 +69,8 @@ export const getUsers = async (req, res) => {
     const users = await listUsers({ role });
     res.status(200).json(users);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la recuperation des utilisateurs.', error: error.message });
+    const status = error.statusCode || 500;
+    const message = status !== 500 && error.message ? error.message : 'Erreur lors de la recuperation des utilisateurs.';
+    res.status(status).json({ message });
   }
 };

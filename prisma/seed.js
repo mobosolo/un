@@ -12,28 +12,36 @@ const {
   Role,
 } = prismaPkg;
 
-async function main() {
-  console.log("Seeding database...");
+const hoursFromNow = (h) => new Date(Date.now() + h * 60 * 60 * 1000);
+const hoursAgo = (h) => new Date(Date.now() - h * 60 * 60 * 1000);
 
-  await prisma.notification.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.basket.deleteMany();
-  await prisma.merchant.deleteMany();
-  await prisma.user.deleteMany();
+async function upsertUser(user) {
+  return prisma.user.upsert({
+    where: { email: user.email },
+    update: {
+      displayName: user.displayName,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+      latitude: user.latitude,
+      longitude: user.longitude,
+    },
+    create: user,
+  });
+}
+
+async function main() {
+  console.log("Seeding database with realistic data...");
 
   const defaultPassword = await bcrypt.hash("password123", 12);
 
-  const admin = await prisma.user.create({
-    data: {
+  const users = [
+    {
       email: "admin@mealflavor.com",
       password: defaultPassword,
       displayName: "Admin MealFlavor",
       role: Role.ADMIN,
     },
-  });
-
-  const merchantUser1 = await prisma.user.create({
-    data: {
+    {
       email: "merchant1@mealflavor.com",
       password: defaultPassword,
       displayName: "Boulangerie Soleil",
@@ -42,10 +50,7 @@ async function main() {
       latitude: "6.137500",
       longitude: "1.212300",
     },
-  });
-
-  const merchantUser2 = await prisma.user.create({
-    data: {
+    {
       email: "merchant2@mealflavor.com",
       password: defaultPassword,
       displayName: "Restaurant Saveurs",
@@ -54,10 +59,7 @@ async function main() {
       latitude: "6.140100",
       longitude: "1.220500",
     },
-  });
-
-  const merchantUser3 = await prisma.user.create({
-    data: {
+    {
       email: "merchant3@mealflavor.com",
       password: defaultPassword,
       displayName: "Epicerie Quartier",
@@ -66,10 +68,25 @@ async function main() {
       latitude: "6.129900",
       longitude: "1.209900",
     },
-  });
-
-  const client1 = await prisma.user.create({
-    data: {
+    {
+      email: "merchant4@mealflavor.com",
+      password: defaultPassword,
+      displayName: "Traiteur Moderne",
+      phoneNumber: "+22890000004",
+      role: Role.MERCHANT,
+      latitude: "6.132800",
+      longitude: "1.225100",
+    },
+    {
+      email: "merchant5@mealflavor.com",
+      password: defaultPassword,
+      displayName: "Fruits et Legumes",
+      phoneNumber: "+22890000005",
+      role: Role.MERCHANT,
+      latitude: "6.128400",
+      longitude: "1.218200",
+    },
+    {
       email: "client1@mealflavor.com",
       password: defaultPassword,
       displayName: "Client Alpha",
@@ -78,10 +95,7 @@ async function main() {
       latitude: "6.131900",
       longitude: "1.222800",
     },
-  });
-
-  const client2 = await prisma.user.create({
-    data: {
+    {
       email: "client2@mealflavor.com",
       password: defaultPassword,
       displayName: "Client Beta",
@@ -90,11 +104,23 @@ async function main() {
       latitude: "6.133200",
       longitude: "1.218600",
     },
-  });
+    {
+      email: "client3@mealflavor.com",
+      password: defaultPassword,
+      displayName: "Client Gamma",
+      phoneNumber: "+22890333333",
+      role: Role.CLIENT,
+      latitude: "6.135000",
+      longitude: "1.214900",
+    },
+  ];
 
-  const merchant1 = await prisma.merchant.create({
-    data: {
-      userId: merchantUser1.id,
+  const createdUsers = await Promise.all(users.map(upsertUser));
+  const userByEmail = Object.fromEntries(createdUsers.map((u) => [u.email, u]));
+
+  const merchants = [
+    {
+      userEmail: "merchant1@mealflavor.com",
       businessName: "Boulangerie Soleil",
       type: "BAKERY",
       address: "Rue du Marche, Lome",
@@ -102,13 +128,9 @@ async function main() {
       longitude: "1.212300",
       phoneNumber: "+22890000001",
       photoURL: "https://picsum.photos/seed/merchant1/600/400",
-      status: MerchantStatus.APPROVED,
     },
-  });
-
-  const merchant2 = await prisma.merchant.create({
-    data: {
-      userId: merchantUser2.id,
+    {
+      userEmail: "merchant2@mealflavor.com",
       businessName: "Restaurant Saveurs",
       type: "RESTAURANT",
       address: "Avenue de la Paix, Lome",
@@ -116,13 +138,9 @@ async function main() {
       longitude: "1.220500",
       phoneNumber: "+22890000002",
       photoURL: "https://picsum.photos/seed/merchant2/600/400",
-      status: MerchantStatus.APPROVED,
     },
-  });
-
-  const merchant3 = await prisma.merchant.create({
-    data: {
-      userId: merchantUser3.id,
+    {
+      userEmail: "merchant3@mealflavor.com",
       businessName: "Epicerie Quartier",
       type: "GROCERY",
       address: "Boulevard du 13 Janvier, Lome",
@@ -130,21 +148,69 @@ async function main() {
       longitude: "1.209900",
       phoneNumber: "+22890000003",
       photoURL: "https://picsum.photos/seed/merchant3/600/400",
-      status: MerchantStatus.PENDING,
     },
+    {
+      userEmail: "merchant4@mealflavor.com",
+      businessName: "Traiteur Moderne",
+      type: "CATERING",
+      address: "Rue des Ecoles, Lome",
+      latitude: "6.132800",
+      longitude: "1.225100",
+      phoneNumber: "+22890000004",
+      photoURL: "https://picsum.photos/seed/merchant4/600/400",
+    },
+    {
+      userEmail: "merchant5@mealflavor.com",
+      businessName: "Fruits et Legumes",
+      type: "GROCERY",
+      address: "Quartier Agoe, Lome",
+      latitude: "6.128400",
+      longitude: "1.218200",
+      phoneNumber: "+22890000005",
+      photoURL: "https://picsum.photos/seed/merchant5/600/400",
+    },
+  ];
+
+  const createdMerchants = [];
+
+  for (const m of merchants) {
+    const user = userByEmail[m.userEmail];
+    const merchant = await prisma.merchant.upsert({
+      where: { userId: user.id },
+      update: {
+        businessName: m.businessName,
+        type: m.type,
+        address: m.address,
+        latitude: m.latitude,
+        longitude: m.longitude,
+        phoneNumber: m.phoneNumber,
+        photoURL: m.photoURL,
+        status: MerchantStatus.APPROVED,
+      },
+      create: {
+        userId: user.id,
+        businessName: m.businessName,
+        type: m.type,
+        address: m.address,
+        latitude: m.latitude,
+        longitude: m.longitude,
+        phoneNumber: m.phoneNumber,
+        photoURL: m.photoURL,
+        status: MerchantStatus.APPROVED,
+      },
+    });
+    createdMerchants.push(merchant);
+  }
+
+  const merchantIds = createdMerchants.map((m) => m.id);
+  await prisma.notification.deleteMany({
+    where: { userId: { in: createdUsers.map((u) => u.id) } },
   });
+  await prisma.basket.deleteMany({ where: { merchantId: { in: merchantIds } } });
 
-  const now = new Date();
-  const plus2h = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-  const plus4h = new Date(now.getTime() + 4 * 60 * 60 * 1000);
-  const plus5h = new Date(now.getTime() + 5 * 60 * 60 * 1000);
-  const plus7h = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-  const minus26h = new Date(now.getTime() - 26 * 60 * 60 * 1000);
-  const minus23h = new Date(now.getTime() - 23 * 60 * 60 * 1000);
-
-  const basket1 = await prisma.basket.create({
-    data: {
-      merchantId: merchant1.id,
+  const basketData = [
+    {
+      merchantEmail: "merchant1@mealflavor.com",
       title: "Panier viennoiseries du soir",
       description: "Croissants, pains au chocolat et pains speciaux",
       category: Category.SWEET,
@@ -152,16 +218,13 @@ async function main() {
       discountedPrice: 1200,
       quantity: 10,
       availableQuantity: 8,
-      pickupTimeStart: plus2h,
-      pickupTimeEnd: plus4h,
-      photoURL: "https://picsum.photos/seed/basket1/800/500",
+      pickupTimeStart: hoursFromNow(2),
+      pickupTimeEnd: hoursFromNow(4),
+      photoURL: "https://plus.unsplash.com/premium_photo-1673108852141-e8c3c22a4a22?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
       status: BasketStatus.AVAILABLE,
     },
-  });
-
-  const basket2 = await prisma.basket.create({
-    data: {
-      merchantId: merchant2.id,
+    {
+      merchantEmail: "merchant2@mealflavor.com",
       title: "Panier repas midi",
       description: "Riz, sauce et accompagnements",
       category: Category.SAVORY,
@@ -169,16 +232,55 @@ async function main() {
       discountedPrice: 1800,
       quantity: 7,
       availableQuantity: 4,
-      pickupTimeStart: plus5h,
-      pickupTimeEnd: plus7h,
-      photoURL: "https://picsum.photos/seed/basket2/800/500",
+      pickupTimeStart: hoursFromNow(5),
+      pickupTimeEnd: hoursFromNow(7),
+      photoURL: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
       status: BasketStatus.AVAILABLE,
     },
-  });
-
-  const basket3 = await prisma.basket.create({
-    data: {
-      merchantId: merchant1.id,
+    {
+      merchantEmail: "merchant3@mealflavor.com",
+      title: "Panier mixte du matin",
+      description: "Fruits, legumes et pain frais",
+      category: Category.MIXED,
+      originalPrice: 3500,
+      discountedPrice: 1500,
+      quantity: 6,
+      availableQuantity: 6,
+      pickupTimeStart: hoursFromNow(1),
+      pickupTimeEnd: hoursFromNow(3),
+      photoURL: "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      status: BasketStatus.AVAILABLE,
+    },
+    {
+      merchantEmail: "merchant4@mealflavor.com",
+      title: "Panier traiteur soir",
+      description: "Poulet roti, legumes sautes, riz",
+      category: Category.SAVORY,
+      originalPrice: 6000,
+      discountedPrice: 2500,
+      quantity: 5,
+      availableQuantity: 2,
+      pickupTimeStart: hoursFromNow(6),
+      pickupTimeEnd: hoursFromNow(8),
+      photoURL: "https://images.unsplash.com/photo-1484723091739-30a097e8f929?q=80&w=749&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      status: BasketStatus.AVAILABLE,
+    },
+    {
+      merchantEmail: "merchant5@mealflavor.com",
+      title: "Panier fruits et legumes",
+      description: "Pommes, bananes, tomates, carottes",
+      category: Category.MIXED,
+      originalPrice: 4000,
+      discountedPrice: 1600,
+      quantity: 8,
+      availableQuantity: 8,
+      pickupTimeStart: hoursFromNow(3),
+      pickupTimeEnd: hoursFromNow(5),
+      photoURL: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      status: BasketStatus.AVAILABLE,
+    },
+    {
+      merchantEmail: "merchant1@mealflavor.com",
       title: "Panier mixte d hier",
       description: "Produits invendus de la veille",
       category: Category.MIXED,
@@ -186,34 +288,59 @@ async function main() {
       discountedPrice: 1400,
       quantity: 5,
       availableQuantity: 0,
-      pickupTimeStart: minus26h,
-      pickupTimeEnd: minus23h,
-      photoURL: "https://picsum.photos/seed/basket3/800/500",
+      pickupTimeStart: hoursAgo(26),
+      pickupTimeEnd: hoursAgo(23),
+      photoURL: "https://plus.unsplash.com/premium_photo-1663858367001-89e5c92d1e0e?q=80&w=715&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
       status: BasketStatus.SOLD_OUT,
     },
-  });
+  ];
 
-  const order1 = await prisma.order.create({
+  const baskets = [];
+  for (const b of basketData) {
+    const merchant = createdMerchants.find((m) => m.userId === userByEmail[b.merchantEmail].id);
+    const basket = await prisma.basket.create({
+      data: {
+        merchantId: merchant.id,
+        title: b.title,
+        description: b.description,
+        category: b.category,
+        originalPrice: b.originalPrice,
+        discountedPrice: b.discountedPrice,
+        quantity: b.quantity,
+        availableQuantity: b.availableQuantity,
+        pickupTimeStart: b.pickupTimeStart,
+        pickupTimeEnd: b.pickupTimeEnd,
+        photoURL: b.photoURL,
+        status: b.status,
+      },
+    });
+    baskets.push(basket);
+  }
+
+  const client1 = userByEmail["client1@mealflavor.com"];
+  const client2 = userByEmail["client2@mealflavor.com"];
+
+  await prisma.order.create({
     data: {
       userId: client1.id,
-      basketId: basket1.id,
-      merchantId: merchant1.id,
-      price: basket1.discountedPrice,
+      basketId: baskets[0].id,
+      merchantId: baskets[0].merchantId,
+      price: baskets[0].discountedPrice,
       paymentMethod: PaymentMethod.CASH,
       paymentStatus: PaymentStatus.PAID,
       orderStatus: OrderStatus.RESERVED,
       qrCode: `qr_${Date.now()}_1`,
       transactionRef: `cash_ref_${Date.now()}_1`,
-      paidAt: now,
+      paidAt: new Date(),
     },
   });
 
-  const order2 = await prisma.order.create({
+  await prisma.order.create({
     data: {
       userId: client2.id,
-      basketId: basket2.id,
-      merchantId: merchant2.id,
-      price: basket2.discountedPrice,
+      basketId: baskets[1].id,
+      merchantId: baskets[1].merchantId,
+      price: baskets[1].discountedPrice,
       paymentMethod: PaymentMethod.FLOOZ,
       paymentStatus: PaymentStatus.PENDING,
       orderStatus: OrderStatus.RESERVED,
@@ -222,64 +349,12 @@ async function main() {
     },
   });
 
-  const order3 = await prisma.order.create({
-    data: {
-      userId: client1.id,
-      basketId: basket3.id,
-      merchantId: merchant1.id,
-      price: basket3.discountedPrice,
-      paymentMethod: PaymentMethod.TMONEY,
-      paymentStatus: PaymentStatus.PAID,
-      orderStatus: OrderStatus.PICKED_UP,
-      qrCode: `qr_${Date.now()}_3`,
-      transactionRef: `tm_ref_${Date.now()}_3`,
-      paidAt: minus23h,
-      pickedUpAt: minus23h,
-    },
-  });
-
-  await prisma.notification.createMany({
-    data: [
-      {
-        userId: client1.id,
-        title: "Reservation confirmee",
-        body: "Votre commande est reservee. Montrez votre QR code au retrait.",
-        type: "ORDER_CONFIRMED",
-        data: { orderId: order1.id, basketId: basket1.id },
-        isRead: false,
-      },
-      {
-        userId: merchantUser1.id,
-        title: "Nouvelle commande",
-        body: "Une nouvelle reservation a ete effectuee sur votre panier.",
-        type: "NEW_ORDER",
-        data: { orderId: order1.id, basketId: basket1.id },
-        isRead: false,
-      },
-      {
-        userId: client2.id,
-        title: "Paiement en attente",
-        body: "Finalisez votre paiement pour confirmer la commande.",
-        type: "PAYMENT_PENDING",
-        data: { orderId: order2.id, basketId: basket2.id },
-        isRead: false,
-      },
-    ],
-  });
-
-  console.log("Seed complete.");
-  console.log("Default password for all seeded users: password123");
-  console.log(`Admin: ${admin.email}`);
-  console.log(`Merchants: ${merchantUser1.email}, ${merchantUser2.email}, ${merchantUser3.email}`);
-  console.log(`Clients: ${client1.email}, ${client2.email}`);
-  console.log(`Created merchants: ${merchant1.id}, ${merchant2.id}, ${merchant3.id}`);
-  console.log(`Created baskets: ${basket1.id}, ${basket2.id}, ${basket3.id}`);
-  console.log(`Created orders: ${order1.id}, ${order2.id}, ${order3.id}`);
+  console.log("Seeding complete.");
 }
 
 main()
   .catch((e) => {
-    console.error("Seed failed:", e);
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {

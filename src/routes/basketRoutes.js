@@ -1,12 +1,12 @@
 // src/routes/basketRoutes.js
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { create, getAll, getOne, update, remove } from '../controllers/basketController.js';
+import { create, getAll, getOne, update, remove, quickUpdate, duplicate } from '../controllers/basketController.js';
 import { protect, authorize } from '../middlewares/authMiddleware.js';
 import prismaPkg from '@prisma/client';
 
 const router = Router();
-const { Role, Category } = prismaPkg;
+const { Role, Category, BasketStatus } = prismaPkg;
 
 const basketValidation = [
   body('title').notEmpty().withMessage('Le titre est requis'),
@@ -24,6 +24,18 @@ router.post('/', protect, authorize(Role.MERCHANT), basketValidation, create);
 router.get('/', getAll);
 router.get('/:id', getOne);
 router.put('/:id', protect, authorize(Role.MERCHANT), basketValidation, update);
+router.patch(
+  '/:id/quick',
+  protect,
+  authorize(Role.MERCHANT),
+  [
+    body('delta').optional().isInt().withMessage('Delta invalide'),
+    body('shiftMinutes').optional().isInt().withMessage('Decalage invalide'),
+    body('status').optional().isIn(Object.values(BasketStatus)).withMessage('Statut invalide'),
+  ],
+  quickUpdate
+);
+router.post('/:id/duplicate', protect, authorize(Role.MERCHANT), duplicate);
 router.delete('/:id', protect, authorize([Role.MERCHANT, Role.ADMIN]), remove);
 
 export default router;

@@ -3,7 +3,7 @@ import cloudinary from '../config/cloudinary.js';
 
 export const uploadImage = async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ message: 'Aucun fichier n\'a été envoyé.' });
+    return res.status(400).json({ message: "Aucun fichier n'a ete envoye." });
   }
 
   try {
@@ -21,9 +21,10 @@ export const uploadImage = async (req, res) => {
       uploadStream.end(req.file.buffer);
     });
 
-
     res.status(200).json({ url: result.secure_url });
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de l\'upload de l\'image.', error: error.message });
+    const status = error.statusCode || 500;
+    const message = status !== 500 && error.message ? error.message : "Erreur lors de l'upload de l'image.";
+    res.status(status).json({ message });
   }
 };

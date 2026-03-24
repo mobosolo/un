@@ -1,7 +1,7 @@
 // src/routes/notificationRoutes.js
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { registerFcmToken } from '../controllers/notificationController.js';
+import { registerFcmToken, listNotifications, markNotificationRead, markAllRead } from '../controllers/notificationController.js';
 import { protect } from '../middlewares/authMiddleware.js';
 
 const router = Router();
@@ -11,5 +11,8 @@ const fcmTokenValidation = [
 ];
 
 router.post('/fcm-token', protect, fcmTokenValidation, registerFcmToken);
+router.get('/', protect, listNotifications);
+router.patch('/:id/read', protect, markNotificationRead);
+router.post('/read-all', protect, markAllRead);
 
 export default router;

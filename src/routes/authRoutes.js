@@ -1,7 +1,7 @@
 // src/routes/authRoutes.js
 import { Router } from 'express';
 import { body } from 'express-validator';
-import { register, login, getMe, updateProfile, forgotPassword, resetPasswordHandler } from '../controllers/authController.js';
+import { register, login, getMe, updateProfile, forgotPassword, resetPasswordHandler, resetPasswordPage } from '../controllers/authController.js';
 import { registerFcmToken } from '../controllers/notificationController.js';
 import { protect, authorize } from '../middlewares/authMiddleware.js';
 import prismaPkg from '@prisma/client';
@@ -39,6 +39,7 @@ const fcmTokenValidation = [
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
 router.post('/forgot-password', body('email').isEmail().withMessage('Email invalide'), forgotPassword);
+router.get('/reset-password-page', resetPasswordPage);
 router.post(
   '/reset-password',
   [

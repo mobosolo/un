@@ -10,16 +10,18 @@ export const register = async (req, res) => {
   }
 
   const { businessName, type, address, latitude, longitude, phoneNumber, photoURL } = req.body;
-  const { id: userId } = req.user; // Extrait de l'utilisateur authentifié via le middleware
+  const { id: userId } = req.user;
 
   try {
     const merchant = await registerMerchant(userId, businessName, type, address, latitude, longitude, phoneNumber, photoURL);
-    res.status(201).json({ message: 'Demande enregistrée. En attente de validation.', merchant });
+    res.status(201).json({ message: 'Demande enregistree. En attente de validation.', merchant });
   } catch (error) {
-    if (error.message === 'Cet utilisateur est déjà associé à un commerce.') {
+    if (error.message === 'Cet utilisateur est deja associe a un commerce.') {
       return res.status(409).json({ message: error.message });
     }
-    res.status(500).json({ message: 'Erreur lors de l\'inscription du commerce.', error: error.message });
+    const status = error.statusCode || 500;
+    const message = status !== 500 && error.message ? error.message : "Erreur lors de l'inscription du commerce.";
+    res.status(status).json({ message });
   }
 };
 
@@ -30,10 +32,12 @@ export const getMyCommerce = async (req, res) => {
     const merchant = await getMyMerchant(userId);
     res.status(200).json(merchant);
   } catch (error) {
-    if (error.message === 'Aucun commerce trouvé pour cet utilisateur.') {
+    if (error.message === 'Aucun commerce trouve pour cet utilisateur.') {
       return res.status(404).json({ message: error.message });
     }
-    res.status(500).json({ message: 'Erreur lors de la récupération du commerce.', error: error.message });
+    const status = error.statusCode || 500;
+    const message = status !== 500 && error.message ? error.message : 'Erreur lors de la recuperation du commerce.';
+    res.status(status).json({ message });
   }
 };
 
@@ -48,13 +52,15 @@ export const updateMyCommerce = async (req, res) => {
     }
 
     if (role !== 'ADMIN' && merchant.userId !== userId) {
-      return res.status(403).json({ message: 'AccÃ¨s interdit.' });
+      return res.status(403).json({ message: 'Acces interdit.' });
     }
 
     const updated = await updateMerchant(merchantId, req.body);
     res.status(200).json(updated);
   } catch (error) {
-    res.status(500).json({ message: 'Erreur lors de la mise Ã  jour du commerce.', error: error.message });
+    const status = error.statusCode || 500;
+    const message = status !== 500 && error.message ? error.message : 'Erreur lors de la mise a jour du commerce.';
+    res.status(status).json({ message });
   }
 };
 
@@ -79,6 +85,15 @@ export const getDailyStats = async (req, res) => {
       },
     });
 
+    const paidTodayCount = await prisma.order.count({
+      where: {
+        merchantId: merchant.id,
+        paymentStatus: 'PAID',
+        orderStatus: { not: 'CANCELLED' },
+        paidAt: { gte: start, lte: end },
+      },
+    });
+
     const revenueAgg = await prisma.order.aggregate({
       where: {
         merchantId: merchant.id,
@@ -93,11 +108,13 @@ export const getDailyStats = async (req, res) => {
     const foodSavedKg = pickedUpCount * 2;
 
     return res.status(200).json({
-      basketsSoldToday: pickedUpCount,
+      basketsSoldToday: paidTodayCount,
       revenueToday: revenue,
       foodSavedKg,
     });
   } catch (error) {
-    return res.status(500).json({ message: 'Erreur lors de la recuperation des statistiques.', error: error.message });
+    const status = error.statusCode || 500;
+    const message = status !== 500 && error.message ? error.message : 'Erreur lors de la recuperation des statistiques.';
+    return res.status(status).json({ message });
   }
 };

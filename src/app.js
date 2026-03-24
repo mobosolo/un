@@ -9,7 +9,6 @@ import basketRoutes from './routes/basketRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
-import paymentRoutes from './routes/paymentRoutes.js';
 import errorMiddleware from './middlewares/errorMiddleware.js';
 
 
@@ -22,9 +21,7 @@ app.use(cors());
 app.use(
   express.json({
     verify: (req, res, buf) => {
-      if ((req.originalUrl || req.url || "").includes("/api/payments/webhook")) {
-        req.rawBody = buf;
-      }
+      req.rawBody = buf;
     },
   })
 ); // To parse JSON bodies
@@ -37,7 +34,6 @@ app.use('/api/baskets', basketRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/payments', paymentRoutes);
 
 
 // Basic route for testing

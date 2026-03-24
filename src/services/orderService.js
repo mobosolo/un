@@ -3,7 +3,6 @@ import prisma from '../utils/prisma.js';
 import QRCode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
 import { sendNotification } from './notificationService.js';
-import { initiateStripePayment } from './paymentService.js';
 import prismaPkg from '@prisma/client';
 const { PaymentMethod, Role } = prismaPkg;
 
@@ -58,8 +57,6 @@ export const createOrder = async (userId, basketId, paymentMethod) => {
 
   let paymentStatus = 'PENDING';
   let paidAt = null;
-  let paymentUrl = null;
-  let transactionRef = null;
 
   if (paymentMethod === PaymentMethod.CASH) {
     paymentStatus = 'PAID';
@@ -80,35 +77,6 @@ export const createOrder = async (userId, basketId, paymentMethod) => {
     },
   });
 
-  // Si le paiement n'est pas en CASH, initier le paiement Stripe
-  if (paymentMethod !== PaymentMethod.CASH) {
-    try {
-      const stripeResponse = await initiateStripePayment(
-        order.id,
-        order.price,
-        user.email,
-        user.displayName,
-        paymentMethod
-      );
-      paymentUrl = stripeResponse.link;
-      transactionRef = stripeResponse.tx_ref;
-
-      // Mettre à jour la commande avec la référence de transaction
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { transactionRef },
-      });
-    } catch (paymentError) {
-      console.warn("Stripe non disponible, passage en mode test CASH:", paymentError?.message || paymentError);
-      paymentStatus = 'PAID';
-      paidAt = new Date();
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { paymentStatus, paidAt },
-      });
-      paymentUrl = null;
-    }
-  }
 
 
   // Envoyer une notification au client pour la confirmation de réservation
@@ -140,7 +108,46 @@ export const createOrder = async (userId, basketId, paymentMethod) => {
   }
 
 
-  return { order, qrCodeImage, paymentUrl };
+  return { order, qrCodeImage, paymentUrl: null };
+};
+
+export const confirmOrderPayment = async (orderId, userId, transactionRef = null) => {
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) {
+    throw new Error('Commande introuvable.');
+  }
+  if (order.userId !== userId) {
+    throw new Error('Acces interdit.');
+  }
+  if (order.orderStatus === 'CANCELLED') {
+    throw new Error('Commande annulee.');
+  }
+  if (order.paymentStatus === 'PAID') {
+    return order;
+  }
+
+  const updated = await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      paymentStatus: 'PAID',
+      paidAt: new Date(),
+      transactionRef: transactionRef ?? order.transactionRef,
+    },
+  });
+
+  try {
+    await sendNotification(
+      userId,
+      'Paiement confirme',
+      'Votre paiement a ete confirme avec succes.',
+      'PAYMENT_CONFIRMED',
+      { orderId: updated.id }
+    );
+  } catch (e) {
+    console.warn('Notification paiement echouee:', e?.message || e);
+  }
+
+  return updated;
 };
 
 export const getMyOrders = async (userId) => {
@@ -153,6 +160,8 @@ export const getMyOrders = async (userId) => {
           photoURL: true,
           pickupTimeStart: true,
           pickupTimeEnd: true,
+          originalPrice: true,
+          discountedPrice: true,
         },
       },
       merchant: {
@@ -206,6 +215,8 @@ export const getOrderById = async (orderId) => {
           photoURL: true,
           pickupTimeStart: true,
           pickupTimeEnd: true,
+          originalPrice: true,
+          discountedPrice: true,
         },
       },
       merchant: {
@@ -258,8 +269,31 @@ export const validateOrderPickup = async (orderId, qrCode, merchantUserId) => {
     },
   });
 
-  // Notification push disabled for pickup validation.
-  // The app confirms success directly in UI after scan.
+  try {
+    await sendNotification(
+      order.userId,
+      'Retrait valide',
+      `Votre commande "${order.basket?.title ?? 'Panier'}" a ete retiree.`,
+      'PICKUP_VALIDATED',
+      { orderId: order.id }
+    );
+  } catch (e) {
+    console.warn('Notification client pickup echouee:', e?.message || e);
+  }
+
+  if (order.merchant?.userId) {
+    try {
+      await sendNotification(
+        order.merchant.userId,
+        'Commande retiree',
+        `La commande "${order.basket?.title ?? 'Panier'}" a ete retiree.`,
+        'PICKUP_VALIDATED',
+        { orderId: order.id }
+      );
+    } catch (e) {
+      console.warn('Notification commercant pickup echouee:', e?.message || e);
+    }
+  }
 
   return updatedOrder;
 };
@@ -298,7 +332,36 @@ export const cancelOrder = async (orderId, userId) => {
     data: { availableQuantity: { increment: 1 }, status: 'AVAILABLE' },
   });
 
+  try {
+    await sendNotification(
+      order.userId,
+      'Commande annulee',
+      'Votre commande a ete annulee.',
+      'ORDER_CANCELLED',
+      { orderId: order.id }
+    );
+  } catch (e) {
+    console.warn('Notification client annulation echouee:', e?.message || e);
+  }
+
+  try {
+    const basket = await prisma.basket.findUnique({ where: { id: order.basketId } });
+    const merchant = await prisma.merchant.findUnique({ where: { id: order.merchantId } });
+    if (merchant?.userId) {
+      await sendNotification(
+        merchant.userId,
+        'Commande annulee',
+        `Une commande${basket?.title ? ` pour "${basket.title}"` : ''} a ete annulee.`,
+        'ORDER_CANCELLED',
+        { orderId: order.id }
+      );
+    }
+  } catch (e) {
+    console.warn('Notification commercant annulation echouee:', e?.message || e);
+  }
+
   return updated;
 };
+
 
 

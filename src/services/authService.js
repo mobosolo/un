@@ -12,7 +12,9 @@ export const registerUser = async (email, password, displayName, phoneNumber, ro
   // Verifier si l'utilisateur existe deja
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
-    throw new Error("Cet email est deja utilise.");
+    const err = new Error("Cet email est deja utilise.");
+    err.statusCode = 409;
+    throw err;
   }
 
   // Hacher le mot de passe
@@ -55,13 +57,17 @@ export const loginUser = async (email, password) => {
   // Trouver l'utilisateur
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
-    throw new Error('Identifiants invalides.');
+    const err = new Error('Identifiants invalides.');
+    err.statusCode = 401;
+    throw err;
   }
 
   // Comparer le mot de passe
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) {
-    throw new Error('Identifiants invalides.');
+    const err = new Error('Identifiants invalides.');
+    err.statusCode = 401;
+    throw err;
   }
 
   // Generer le token JWT

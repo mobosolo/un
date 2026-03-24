@@ -3,3 +3,5 @@ node_modules
 
 
 /src/generated/prisma
+src/config/serviceAccountKey.json
+*.firebase-adminsdk*.json
