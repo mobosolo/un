@@ -15,22 +15,56 @@ const {
 const hoursFromNow = (h) => new Date(Date.now() + h * 60 * 60 * 1000);
 const hoursAgo = (h) => new Date(Date.now() - h * 60 * 60 * 1000);
 
+const RETRY_DELAY_MS = 400;
+const MAX_RETRIES = 4;
+
+const isConnectionClosedError = (err) => {
+  if (!err) return false;
+  if (err.code === "P1017") return true;
+  const msg = String(err.message || "");
+  if (msg.toLowerCase().includes("closed the connection")) return true;
+  const adapterMsg = String(err?.meta?.driverAdapterError?.message || "");
+  return adapterMsg.toLowerCase().includes("connectionclosed");
+};
+
+async function withRetry(fn, label) {
+  let attempt = 0;
+  // Retry transient DB connection closures (e.g. pooled Neon connections).
+  while (true) {
+    try {
+      return await fn();
+    } catch (err) {
+      attempt += 1;
+      if (!isConnectionClosedError(err) || attempt > MAX_RETRIES) {
+        throw err;
+      }
+      console.warn(`${label} failed (connection closed). Retrying ${attempt}/${MAX_RETRIES}...`);
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
+    }
+  }
+}
+
 async function upsertUser(user) {
-  return prisma.user.upsert({
-    where: { email: user.email },
-    update: {
-      displayName: user.displayName,
-      phoneNumber: user.phoneNumber,
-      role: user.role,
-      latitude: user.latitude,
-      longitude: user.longitude,
-    },
-    create: user,
-  });
+  return withRetry(
+    () =>
+      prisma.user.upsert({
+        where: { email: user.email },
+        update: {
+          displayName: user.displayName,
+          phoneNumber: user.phoneNumber,
+          role: user.role,
+          latitude: user.latitude,
+          longitude: user.longitude,
+        },
+        create: user,
+      }),
+    `upsertUser:${user.email}`
+  );
 }
 
 async function main() {
   console.log("Seeding database with realistic data...");
+  await prisma.$connect();
 
   const defaultPassword = await bcrypt.hash("password123", 12);
 
@@ -115,7 +149,10 @@ async function main() {
     },
   ];
 
-  const createdUsers = await Promise.all(users.map(upsertUser));
+  const createdUsers = [];
+  for (const user of users) {
+    createdUsers.push(await upsertUser(user));
+  }
   const userByEmail = Object.fromEntries(createdUsers.map((u) => [u.email, u]));
 
   const merchants = [
@@ -175,38 +212,49 @@ async function main() {
 
   for (const m of merchants) {
     const user = userByEmail[m.userEmail];
-    const merchant = await prisma.merchant.upsert({
-      where: { userId: user.id },
-      update: {
-        businessName: m.businessName,
-        type: m.type,
-        address: m.address,
-        latitude: m.latitude,
-        longitude: m.longitude,
-        phoneNumber: m.phoneNumber,
-        photoURL: m.photoURL,
-        status: MerchantStatus.APPROVED,
-      },
-      create: {
-        userId: user.id,
-        businessName: m.businessName,
-        type: m.type,
-        address: m.address,
-        latitude: m.latitude,
-        longitude: m.longitude,
-        phoneNumber: m.phoneNumber,
-        photoURL: m.photoURL,
-        status: MerchantStatus.APPROVED,
-      },
-    });
+    const merchant = await withRetry(
+      () =>
+        prisma.merchant.upsert({
+          where: { userId: user.id },
+          update: {
+            businessName: m.businessName,
+            type: m.type,
+            address: m.address,
+            latitude: m.latitude,
+            longitude: m.longitude,
+            phoneNumber: m.phoneNumber,
+            photoURL: m.photoURL,
+            status: MerchantStatus.APPROVED,
+          },
+          create: {
+            userId: user.id,
+            businessName: m.businessName,
+            type: m.type,
+            address: m.address,
+            latitude: m.latitude,
+            longitude: m.longitude,
+            phoneNumber: m.phoneNumber,
+            photoURL: m.photoURL,
+            status: MerchantStatus.APPROVED,
+          },
+        }),
+      `upsertMerchant:${m.userEmail}`
+    );
     createdMerchants.push(merchant);
   }
 
   const merchantIds = createdMerchants.map((m) => m.id);
-  await prisma.notification.deleteMany({
-    where: { userId: { in: createdUsers.map((u) => u.id) } },
-  });
-  await prisma.basket.deleteMany({ where: { merchantId: { in: merchantIds } } });
+  await withRetry(
+    () =>
+      prisma.notification.deleteMany({
+        where: { userId: { in: createdUsers.map((u) => u.id) } },
+      }),
+    "deleteNotifications"
+  );
+  await withRetry(
+    () => prisma.basket.deleteMany({ where: { merchantId: { in: merchantIds } } }),
+    "deleteBaskets"
+  );
 
   const basketData = [
     {
@@ -298,56 +346,68 @@ async function main() {
   const baskets = [];
   for (const b of basketData) {
     const merchant = createdMerchants.find((m) => m.userId === userByEmail[b.merchantEmail].id);
-    const basket = await prisma.basket.create({
-      data: {
-        merchantId: merchant.id,
-        title: b.title,
-        description: b.description,
-        category: b.category,
-        originalPrice: b.originalPrice,
-        discountedPrice: b.discountedPrice,
-        quantity: b.quantity,
-        availableQuantity: b.availableQuantity,
-        pickupTimeStart: b.pickupTimeStart,
-        pickupTimeEnd: b.pickupTimeEnd,
-        photoURL: b.photoURL,
-        status: b.status,
-      },
-    });
+    const basket = await withRetry(
+      () =>
+        prisma.basket.create({
+          data: {
+            merchantId: merchant.id,
+            title: b.title,
+            description: b.description,
+            category: b.category,
+            originalPrice: b.originalPrice,
+            discountedPrice: b.discountedPrice,
+            quantity: b.quantity,
+            availableQuantity: b.availableQuantity,
+            pickupTimeStart: b.pickupTimeStart,
+            pickupTimeEnd: b.pickupTimeEnd,
+            photoURL: b.photoURL,
+            status: b.status,
+          },
+        }),
+      `createBasket:${b.title}`
+    );
     baskets.push(basket);
   }
 
   const client1 = userByEmail["client1@mealflavor.com"];
   const client2 = userByEmail["client2@mealflavor.com"];
 
-  await prisma.order.create({
-    data: {
-      userId: client1.id,
-      basketId: baskets[0].id,
-      merchantId: baskets[0].merchantId,
-      price: baskets[0].discountedPrice,
-      paymentMethod: PaymentMethod.CASH,
-      paymentStatus: PaymentStatus.PAID,
-      orderStatus: OrderStatus.RESERVED,
-      qrCode: `qr_${Date.now()}_1`,
-      transactionRef: `cash_ref_${Date.now()}_1`,
-      paidAt: new Date(),
-    },
-  });
+  await withRetry(
+    () =>
+      prisma.order.create({
+        data: {
+          userId: client1.id,
+          basketId: baskets[0].id,
+          merchantId: baskets[0].merchantId,
+          price: baskets[0].discountedPrice,
+          paymentMethod: PaymentMethod.CASH,
+          paymentStatus: PaymentStatus.PAID,
+          orderStatus: OrderStatus.RESERVED,
+          qrCode: `qr_${Date.now()}_1`,
+          transactionRef: `cash_ref_${Date.now()}_1`,
+          paidAt: new Date(),
+        },
+      }),
+    "createOrder:client1"
+  );
 
-  await prisma.order.create({
-    data: {
-      userId: client2.id,
-      basketId: baskets[1].id,
-      merchantId: baskets[1].merchantId,
-      price: baskets[1].discountedPrice,
-      paymentMethod: PaymentMethod.FLOOZ,
-      paymentStatus: PaymentStatus.PENDING,
-      orderStatus: OrderStatus.RESERVED,
-      qrCode: `qr_${Date.now()}_2`,
-      transactionRef: `flw_ref_${Date.now()}_2`,
-    },
-  });
+  await withRetry(
+    () =>
+      prisma.order.create({
+        data: {
+          userId: client2.id,
+          basketId: baskets[1].id,
+          merchantId: baskets[1].merchantId,
+          price: baskets[1].discountedPrice,
+          paymentMethod: PaymentMethod.FLOOZ,
+          paymentStatus: PaymentStatus.PENDING,
+          orderStatus: OrderStatus.RESERVED,
+          qrCode: `qr_${Date.now()}_2`,
+          transactionRef: `flw_ref_${Date.now()}_2`,
+        },
+      }),
+    "createOrder:client2"
+  );
 
   console.log("Seeding complete.");
 }
