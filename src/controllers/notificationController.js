@@ -81,3 +81,35 @@ export const markAllRead = async (req, res) => {
     res.status(status).json({ message });
   }
 };
+
+export const deleteNotification = async (req, res) => {
+  const { id: userId } = req.user;
+  const { id } = req.params;
+
+  try {
+    const notification = await prisma.notification.findUnique({ where: { id } });
+    if (!notification || notification.userId !== userId) {
+      return res.status(404).json({ message: 'Notification introuvable.' });
+    }
+    await prisma.notification.delete({ where: { id } });
+    res.status(200).json({ message: 'Notification supprimee.' });
+  } catch (error) {
+    const status = error.statusCode || 500;
+    const message =
+      status !== 500 && error.message ? error.message : 'Erreur lors de la suppression de la notification.';
+    res.status(status).json({ message });
+  }
+};
+
+export const deleteAllNotifications = async (req, res) => {
+  const { id: userId } = req.user;
+  try {
+    await prisma.notification.deleteMany({ where: { userId } });
+    res.status(200).json({ message: 'Toutes les notifications ont ete supprimees.' });
+  } catch (error) {
+    const status = error.statusCode || 500;
+    const message =
+      status !== 500 && error.message ? error.message : 'Erreur lors de la suppression des notifications.';
+    res.status(status).json({ message });
+  }
+};
